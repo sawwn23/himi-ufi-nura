@@ -1,0 +1,39 @@
+diff --git a/lk2nd/device/dts/msm8916/msm8916-512mb-mtp.dts b/lk2nd/device/dts/msm8916/msm8916-512mb-mtp.dts
+index fc3a301..0d63714 100644
+--- a/lk2nd/device/dts/msm8916/msm8916-512mb-mtp.dts
++++ b/lk2nd/device/dts/msm8916/msm8916-512mb-mtp.dts
+@@ -51,6 +51,25 @@
+ 		};
+ 	};
+ 
++	himi-ufi-esim {
++		model = "HiMiLink 4G UFI (eSIM-switch rev)";
++		compatible = "himi,ufi-esim";
++
++		/* Board passes this panel string; no other known stick uses 128160. */
++		lk2nd,match-cmdline = "* mdss_mdp.panel=1:spi:0:qcom,mdss_spi_st7735s_128160_cmd";
++
++		lk2nd,dtb-files = "msm8916-himi-ufi-esim";
++
++		gpio-keys {
++			compatible = "gpio-keys";
++			edl {
++				/* Reset/EDL button; stock DTB: gpio37 active-high */
++				lk2nd,code = <KEY_HOME>;
++				gpios = <&tlmm 37 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
++			};
++		};
++	};
++
+ 	thwc-ufi001c {
+ 		model = "ufi-001c/ufi-001b 4G Modem Stick";
+ 		compatible = "thwc,ufi001c";
+diff --git a/project/lk1st-msm8916.mk b/project/lk1st-msm8916.mk
+index 74275fa..fa4834d 100644
+--- a/project/lk1st-msm8916.mk
++++ b/project/lk1st-msm8916.mk
+@@ -1,3 +1,4 @@
+ # SPDX-License-Identifier: BSD-3-Clause
+ TARGET := msm8916
+ include lk2nd/project/lk1st.mk
++DEFINES += USE_TARGET_HS200_CAPS=1

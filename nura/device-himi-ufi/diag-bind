@@ -1,0 +1,39 @@
+#!/bin/sh
+# diag-bind.sh - bind the modem's SMD DIAG channel to rpmsg_chrdev so a
+# /dev/rpmsg* node appears. On this board the modem is remoteproc1.
+# Prints "DIAG=/dev/rpmsgN" for each bound channel. Idempotent.
+set -u
+BUS=/sys/bus/rpmsg
+DRV=rpmsg_chrdev
+# remoteprocN numbering changes between boots: find the modem (MSS, 4080000.remoteproc) by name.
+RP=
+for r in /sys/class/remoteproc/remoteproc*; do
+	[ "$(cat "$r/name" 2>/dev/null)" = 4080000.remoteproc ] && RP=$(basename "$r")
+done
+[ -n "$RP" ] || { echo "modem remoteproc not found" >&2; exit 1; }
+bind_one() {
+	dev="$RP:smd-edge.$1.-1.-1"
+	d="$BUS/devices/$dev"
+	[ -d "$d" ] || { echo "no device: $dev" >&2; return 1; }
+	cur=$(basename "$(readlink "$d/driver" 2>/dev/null)" 2>/dev/null)
+	[ "$cur" = "$DRV" ] && { node_of "$dev"; return 0; }
+	[ -n "$cur" ] && echo "$dev" > "$BUS/drivers/$cur/unbind" 2>/dev/null
+	echo "$DRV" > "$d/driver_override" 2>/dev/null || return 1
+	echo "$dev" > "$BUS/drivers/$DRV/bind" 2>/dev/null || return 1
+	sleep 1
+	node_of "$dev"
+}
+node_of() {
+	for p in "$BUS/devices/$1"/rpmsg/rpmsg*; do
+		[ -e "$p" ] || continue
+		name=$(basename "$p")
+		if [ ! -c "/dev/$name" ]; then
+			devt=$(cat "/sys/class/rpmsg/$name/dev" 2>/dev/null)
+			[ -n "$devt" ] && mknod "/dev/$name" c "${devt%:*}" "${devt#*:}" && chmod 600 "/dev/$name"
+		fi
+		echo "$2DIAG_NODE=/dev/$name"
+		return 0
+	done
+}
+echo "== DIAG =="; bind_one DIAG
+echo "== DIAG_CMD =="; bind_one DIAG_CMD

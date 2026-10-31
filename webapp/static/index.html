@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dongle</title>
+<style>
+:root{
+  --bg:#f4f5f7;--panel:#fff;--ink:#16181d;--muted:#6b7280;--line:#e3e5ea;
+  --accent:#2f6fed;--ok:#1a9b5b;--warn:#c98a06;--bad:#d1453b;--chip:#eef1f6;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1115;--panel:#171a21;--ink:#e7e9ee;--muted:#8b93a3;--line:#262a33;
+  --accent:#6b9bff;--ok:#3ccf87;--warn:#f0b43c;--bad:#ff6b5f;--chip:#20242d;color-scheme:dark;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}
+header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;background:var(--chip);font-size:12.5px;font-weight:550}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.ok .dot{background:var(--ok)}.warn .dot{background:var(--warn)}.bad .dot{background:var(--bad)}
+.spacer{flex:1}
+main{max-width:1200px;margin:0 auto;padding:20px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.card h2{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:0 0 12px;font-weight:600;display:flex;align-items:center;gap:8px}
+.c4{grid-column:span 4}.c5{grid-column:span 5}.c7{grid-column:span 7}.c8{grid-column:span 8}.c12{grid-column:span 12}
+@media (max-width:900px){.c4,.c5,.c7,.c8{grid-column:span 12}}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
+dt{color:var(--muted)}dd{margin:0;text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.big{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0 10px}
+.metric small{font-size:12px;font-weight:500;color:var(--muted)}
+.metric{background:var(--chip);border-radius:9px;padding:9px 10px}
+.metric .k{font-size:11.5px;color:var(--muted)}.metric .v{font-size:18px;font-weight:620;font-variant-numeric:tabular-nums}
+.metric .q{font-size:11.5px}
+.bar{height:6px;border-radius:3px;background:var(--chip);overflow:hidden;margin-top:8px}
+.bar>i{display:block;height:100%;background:var(--accent);transition:width .4s}
+canvas{width:100%;height:120px;display:block}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.legend b{display:inline-block;width:10px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+button,input,textarea{font:inherit;color:inherit}
+button{background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:550}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger:hover{border-color:var(--bad);color:var(--bad)}
+button:disabled{opacity:.5;cursor:default}
+input,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>input{flex:1;min-width:120px}
+.stack{display:grid;gap:10px}
+.inbox{display:grid;grid-template-columns:260px 1fr;gap:14px;min-height:380px}
+@media (max-width:700px){.inbox{grid-template-columns:1fr}}
+.threads{border-right:1px solid var(--line);overflow:auto;max-height:520px;margin:-4px 0}
+@media (max-width:700px){.threads{border-right:0;max-height:220px}}
+.thread{padding:10px 10px 10px 8px;border-radius:8px;cursor:pointer;display:grid;gap:2px;margin-right:10px}
+.thread:hover{background:var(--chip)}.thread.sel{background:var(--chip);box-shadow:inset 3px 0 var(--accent)}
+.thread .n{font-weight:620;display:flex;gap:6px;align-items:center}
+.thread .p{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thread .t{color:var(--muted);font-size:11.5px}
+.badge{background:var(--accent);color:#fff;border-radius:99px;font-size:11px;padding:0 7px;font-weight:650}
+.conv{display:flex;flex-direction:column;min-width:0}
+.conv-head{display:flex;align-items:center;gap:8px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line);font-weight:620}
+.conv-head button{font-size:12.5px;padding:5px 10px}
+.msgs{flex:1;overflow:auto;max-height:420px;display:flex;flex-direction:column;gap:10px;padding:2px}
+.msg{max-width:85%;background:var(--chip);border-radius:12px;padding:9px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.out{align-self:flex-end;background:var(--accent);color:#fff}
+.msg .meta{display:flex;gap:10px;justify-content:space-between;font-size:11px;opacity:.7;margin-top:5px}
+.msg .del{background:none;border:0;padding:0;font-size:11px;color:inherit;opacity:.8}
+.msg .del:hover{color:var(--bad);opacity:1}
+.compose{display:grid;gap:8px;margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+.compose .count{font-size:12px;color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:40px 10px}
+.ussd-log{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;min-height:120px;max-height:240px;overflow:auto;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}
+.ussd-log .me{color:var(--accent)}.ussd-log .err{color:var(--bad)}
+.note{font-size:12px;color:var(--muted)}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:9px;font-weight:550;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw}
+#toast.show{opacity:1}#toast.err{background:var(--bad);color:#fff}
+.offline{grid-column:span 12;text-align:center;padding:50px 20px}
+</style>
+</head>
+<body>
+<header>
+  <h1>LTE Dongle</h1>
+  <span id="state" class="pill"><span class="dot"></span><span>connecting…</span></span>
+  <span id="op" class="pill" hidden></span>
+  <span id="tech" class="pill" hidden></span>
+  <span class="spacer"></span>
+  <span id="updated" class="note"></span>
+  <button id="logout" hidden>Log out</button>
+</header>
+
+<main id="app">
+  <section class="card c4">
+    <h2>Signal</h2>
+    <div class="row" style="align-items:baseline;gap:6px"><span class="big" id="quality">–</span><span class="note">% quality</span></div>
+    <div class="bar"><i id="qbar" style="width:0"></i></div>
+    <div class="metrics">
+      <div class="metric"><div class="k">RSRP</div><div class="v" id="rsrp">–</div><div class="q" id="rsrpq"></div></div>
+      <div class="metric"><div class="k">SNR</div><div class="v" id="snr">–</div><div class="q" id="snrq"></div></div>
+      <div class="metric"><div class="k">RSRQ</div><div class="v" id="rsrq">–</div><div class="q"></div></div>
+      <div class="metric"><div class="k">RSSI</div><div class="v" id="rssi">–</div><div class="q"></div></div>
+    </div>
+    <canvas id="chart" width="600" height="240"></canvas>
+    <div class="legend"><span><b style="background:var(--accent)"></b>RSRP (dBm)</span><span><b style="background:var(--warn)"></b>SNR (dB)</span><span class="spacer"></span><span>last 5 min</span></div>
+  </section>
+
+  <section class="card c4">
+    <h2>Network</h2>
+    <dl id="net"></dl>
+  </section>
+
+  <section class="card c4">
+    <h2>SIM &amp; Device</h2>
+    <dl id="dev"></dl>
+  </section>
+
+  <section class="card c12">
+    <h2>Messages <span id="unread" class="badge" hidden></span><span class="spacer"></span>
+      <button id="newmsg" style="text-transform:none;letter-spacing:0">New message</button></h2>
+    <div class="inbox">
+      <div class="threads" id="threads"></div>
+      <div class="conv">
+        <div class="conv-head" id="convhead" hidden>
+          <span id="convname"></span><span class="spacer"></span>
+          <button class="danger" id="delthread">Delete conversation</button>
+        </div>
+        <div class="msgs" id="msgs"><div class="empty">Select a conversation</div></div>
+        <form class="compose" id="compose">
+          <input id="to" placeholder="Recipient, e.g. +9597…" autocomplete="off">
+          <textarea id="body" rows="3" placeholder="Message"></textarea>
+          <div class="row"><span class="count" id="count">0 chars</span><span class="spacer"></span><button class="primary" id="send">Send</button></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="card c7">
+    <h2>USSD</h2>
+    <div class="stack">
+      <div class="ussd-log" id="ussdlog"><span class="note">Send a code like *124# to check balance. While roaming, the home network may not answer.</span></div>
+      <form class="row" id="ussdform">
+        <input id="ussdcode" placeholder="*124#" autocomplete="off" inputmode="tel">
+        <button class="primary">Send</button>
+        <button type="button" id="ussdcancel">End session</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="card c5">
+    <h2>Controls</h2>
+    <div class="stack">
+      <div class="row">
+        <button id="enable">Enable</button>
+        <button id="disable" class="danger">Disable</button>
+        <button id="reset" class="danger">Reset modem</button>
+      </div>
+      <form class="row" id="pinform">
+        <input id="pin" type="password" placeholder="SIM PIN" inputmode="numeric" autocomplete="off">
+        <button>Unlock SIM</button>
+      </form>
+      <form class="row" id="dataform">
+        <input id="apn" placeholder="APN" value="INTERNET">
+        <button class="primary" id="connect">Connect data</button>
+        <button type="button" id="disconnect">Disconnect</button>
+      </form>
+      <dl id="bearer"></dl>
+      <p class="note" style="margin:0">Connect sets up the bearer only. The <code id="iface">wwan</code> interface still needs the IP above applied (or use NetworkManager) to route traffic. Data is roaming — watch charges.</p>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const v = x => (x === undefined || x === null || x === '--' || x === '') ? null : x;
+const get = (o, ...k) => k.reduce((a, b) => a?.[b], o);
+
+let toastT;
+function toast(msg, err) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+  clearTimeout(toastT); toastT = setTimeout(() => t.className = '', err ? 5000 : 2500);
+}
+async function api(path, opts = {}) {
+  const r = await fetch(path, {...opts, headers: {'Content-Type': 'application/json'},
+    body: opts.body ? JSON.stringify(opts.body) : undefined});
+  if (r.status === 401) { location.href = '/login'; throw new Error('login required'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+// Run an action with its button disabled, toasting the outcome.
+async function act(btn, fn, okMsg) {
+  if (btn) btn.disabled = true;
+  try { const r = await fn(); if (okMsg) toast(okMsg); refresh(); return r; }
+  catch (e) { toast(e.message, true); }
+  finally { if (btn) btn.disabled = false; }
+}
+
+function dl(el, rows) {
+  el.innerHTML = rows.filter(r => v(r[1]) !== null)
+    .map(([k, val]) => `<dt>${esc(k)}</dt><dd>${esc(val)}</dd>`).join('') || '<dt class="note">No data</dt>';
+}
+function pill(el, text, cls) {
+  el.hidden = !text; el.className = 'pill ' + (cls || '');
+  el.innerHTML = `<span class="dot"></span><span>${esc(text)}</span>`;
+}
+
+// ---- signal ----
+const hist = []; // {t, rsrp, snr}
+function grade(val, good, ok) {
+  if (val === null) return ['', ''];
+  return val >= good ? ['good', 'var(--ok)'] : val >= ok ? ['fair', 'var(--warn)'] : ['weak', 'var(--bad)'];
+}
+function drawChart() {
+  const c = $('#chart'), g = c.getContext('2d'), W = c.width, H = c.height;
+  const css = getComputedStyle(document.documentElement);
+  g.clearRect(0, 0, W, H);
+  const now = Date.now(), span = 300e3;
+  const x = t => W - (now - t) / span * W;
+  // guide line: RSRP -110 dBm, the attach threshold
+  const yR = r => H - (r + 130) / 60 * H;          // -130..-70 dBm
+  const yS = s => H - (s + 5) / 30 * H;            // -5..25 dB
+  g.strokeStyle = css.getPropertyValue('--line'); g.setLineDash([4, 4]); g.lineWidth = 2;
+  g.beginPath(); g.moveTo(0, yR(-110)); g.lineTo(W, yR(-110)); g.stroke(); g.setLineDash([]);
+  g.fillStyle = css.getPropertyValue('--muted'); g.font = '20px system-ui'; g.fillText('-110 dBm', 6, yR(-110) - 6);
+  for (const [key, y, col] of [['rsrp', yR, '--accent'], ['snr', yS, '--warn']]) {
+    g.strokeStyle = css.getPropertyValue(col); g.lineWidth = 3; g.lineJoin = 'round'; g.beginPath();
+    let started = false;
+    for (const p of hist) {
+      if (p[key] === null) { started = false; continue; }
+      const py = Math.max(2, Math.min(H - 2, y(p[key])));
+      started ? g.lineTo(x(p.t), py) : g.moveTo(x(p.t), py); started = true;
+    }
+    g.stroke();
+  }
+}
+function renderSignal(st) {
+  const q = +get(st, 'modem', 'generic', 'signal-quality', 'value') || 0;
+  $('#quality').textContent = st.present ? q : '–';
+  $('#qbar').style.width = q + '%';
+  const lte = get(st, 'signal', 'lte') || {};
+  const num = k => v(lte[k]) === null ? null : parseFloat(lte[k]);
+  const rsrp = num('rsrp'), snr = num('snr');
+  const fmt = (n, u) => n === null ? '–' : `${n.toFixed(n % 1 ? 1 : 0)} <small>${u}</small>`;
+  $('#rsrp').innerHTML = fmt(rsrp, 'dBm'); $('#snr').innerHTML = fmt(snr, 'dB');
+  $('#rsrq').innerHTML = fmt(num('rsrq'), 'dB'); $('#rssi').innerHTML = fmt(num('rssi'), 'dBm');
+  for (const [id, val, good, ok] of [['#rsrpq', rsrp, -100, -110], ['#snrq', snr, 10, 0]]) {
+    const [txt, col] = grade(val, good, ok); $(id).textContent = txt; $(id).style.color = col;
+  }
+  hist.push({t: Date.now(), rsrp, snr});
+  while (hist.length && Date.now() - hist[0].t > 300e3) hist.shift();
+  drawChart();
+}
+
+// ---- status ----
+let signalArmed = false;
+async function refresh() {
+  let st;
+  try { st = await api('/api/status'); }
+  catch (e) { pill($('#state'), 'server unreachable', 'bad'); return; }
+  $('#updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+  $('#logout').hidden = !st.auth;
+  if (!st.present) {
+    pill($('#state'), 'no modem — check USB', 'bad'); $('#op').hidden = $('#tech').hidden = true;
+    renderSignal(st); dl($('#net'), []); dl($('#dev'), []); return;
+  }
+  const gen = st.modem.generic, g3 = st.modem['3gpp'] || {};
+  const state = gen.state;
+  const cls = {connected: 'ok', registered: 'ok', enabled: 'warn', searching: 'warn', enabling: 'warn',
+    connecting: 'warn', locked: 'bad', disabled: 'bad', failed: 'bad'}[state] || '';
+  pill($('#state'), state === 'failed' ? `failed: ${gen['state-failed-reason']}` : state, cls);
+  pill($('#op'), v(g3['operator-name']) ? `${g3['operator-name']}${g3['registration-state'] === 'roaming' ? ' · roaming' : ''}` : '', 'ok');
+  pill($('#tech'), (gen['access-technologies'] || []).join(', ').toUpperCase(), '');
+
+  // Signal polling must be armed once per modem session or RSRP/SNR stay empty.
+  if (!signalArmed && get(st, 'signal', 'refresh', 'rate') === '0' && ['registered', 'connected', 'enabled'].includes(state)) {
+    signalArmed = true; api('/api/modem/signal-setup', {method: 'POST'}).catch(() => {});
+  }
+  renderSignal(st);
+
+  dl($('#net'), [
+    ['State', state], ['Registration', g3['registration-state']], ['Operator', g3['operator-name']],
+    ['Operator code', g3['operator-code']], ['Packet service', g3['packet-service-state']],
+    ['Access tech', (gen['access-technologies'] || []).join(', ')], ['Modes', gen['current-modes']],
+    ['Bands', (gen['current-bands'] || []).join(', ')], ['Default APN', get(g3, 'eps', 'initial-bearer', 'settings', 'apn')],
+  ]);
+  const sim = st.sim || {};
+  const retries = (gen['unlock-retries'] || []).find(r => r.startsWith('sim-pin ('));
+  dl($('#dev'), [
+    ['SIM operator', sim['operator-name']], ['IMSI', sim.imsi], ['ICCID', sim.iccid],
+    ['Own number', (gen['own-numbers'] || []).join(', ')], ['PIN retries', retries?.match(/\d+/)?.[0]],
+    ['IMEI', g3.imei], ['Firmware', gen.revision], ['Ports', (gen.ports || []).join(', ')],
+    ['Power', gen['power-state']],
+  ]);
+
+  const b = (st.bearers || []).find(b => b?.status?.connected === 'yes') || (st.bearers || [])[0];
+  if (b) {
+    const ip4 = b['ipv4-config'] || {};
+    $('#iface').textContent = v(b.status.interface) || 'wwan';
+    dl($('#bearer'), [['Bearer', b.status.connected === 'yes' ? 'connected' : 'disconnected'],
+      ['APN', get(b, 'properties', 'apn')], ['Interface', b.status.interface],
+      ['IPv4', v(ip4.address) && `${ip4.address}/${ip4.prefix}`], ['Gateway', ip4.gateway], ['DNS', (ip4.dns || []).join(', ')]]);
+  } else $('#bearer').innerHTML = '';
+}
+
+// ---- SMS ----
+let msgs = [], selected = null, firstLoad = true;
+const readKey = m => `${m.number}|${m.timestamp}|${m.text.length}`;
+let readSet; try { readSet = new Set(JSON.parse(localStorage.getItem('read') || '[]')); } catch { readSet = new Set(); }
+const saveRead = () => { try { localStorage.setItem('read', JSON.stringify([...readSet])); } catch {} };
+const isOut = m => m.pduType === 'submit';
+const when = ts => { const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleString([], {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}); };
+
+async function loadSMS() {
+  try { msgs = await api('/api/sms'); } catch { return; }
+  const unread = msgs.filter(m => !isOut(m) && !readSet.has(readKey(m)));
+  if (!firstLoad && unread.length > (loadSMS.lastUnread || 0)) {
+    const m = unread[0]; toast(`New SMS from ${m.number}`);
+    if (document.hidden && 'Notification' in window && Notification.permission === 'granted')
+      new Notification(`SMS from ${m.number}`, {body: m.text.slice(0, 140)});
+  }
+  loadSMS.lastUnread = unread.length; firstLoad = false;
+  $('#unread').hidden = !unread.length; $('#unread').textContent = unread.length;
+  document.title = unread.length ? `(${unread.length}) Dongle` : 'Dongle';
+  renderThreads();
+}
+function renderThreads() {
+  const by = new Map();
+  for (const m of msgs) { if (!by.has(m.number)) by.set(m.number, []); by.get(m.number).push(m); }
+  const el = $('#threads');
+  if (!by.size) { el.innerHTML = '<div class="empty">No messages on the modem yet</div>'; return; }
+  el.innerHTML = [...by].map(([num, list]) => {
+    const n = list.filter(m => !isOut(m) && !readSet.has(readKey(m))).length;
+    return `<div class="thread ${num === selected ? 'sel' : ''}" data-num="${esc(num)}">
+      <div class="n">${esc(num)}${n ? `<span class="badge">${n}</span>` : ''}</div>
+      <div class="p">${esc(list[0].text)}</div><div class="t">${when(list[0].timestamp)}</div></div>`;
+  }).join('');
+  if (selected) renderConv();
+}
+function renderConv() {
+  const list = msgs.filter(m => m.number === selected).reverse();
+  const el = $('#msgs');
+  $('#convhead').hidden = !list.length;
+  $('#convname').textContent = `${selected} · ${list.length} message${list.length === 1 ? '' : 's'}`;
+  if (!list.length) { el.innerHTML = '<div class="empty">No messages</div>'; return; }
+  el.innerHTML = list.map(m => `<div class="msg ${isOut(m) ? 'out' : ''}">${esc(m.text)}
+    <div class="meta"><span>${when(m.timestamp)}${isOut(m) ? ' · ' + esc(m.state) : ''}</span>
+    <button class="del" data-id="${m.id}">delete</button></div></div>`).join('');
+  el.scrollTop = el.scrollHeight;
+  let changed = false;
+  for (const m of list) if (!readSet.has(readKey(m))) { readSet.add(readKey(m)); changed = true; }
+  if (changed) { saveRead(); loadSMS(); }
+}
+$('#threads').addEventListener('click', e => {
+  const t = e.target.closest('.thread'); if (!t) return;
+  selected = t.dataset.num; $('#to').value = /^\+?\d+$/.test(selected) ? selected : '';
+  renderThreads();
+});
+$('#msgs').addEventListener('click', e => {
+  const b = e.target.closest('.del'); if (!b) return;
+  if (b.dataset.armed) return act(b, () => api('/api/sms/' + b.dataset.id, {method: 'DELETE'}), 'Deleted').then(loadSMS);
+  b.dataset.armed = 1; b.textContent = 'confirm delete?';
+  setTimeout(() => { delete b.dataset.armed; b.textContent = 'delete'; }, 3000);
+});
+// Delete every message from the selected sender, one modem call each.
+confirmBtn($('#delthread'), 'Delete conversation', b => act(b, async () => {
+  const ids = msgs.filter(m => m.number === selected).map(m => m.id);
+  for (const id of ids) await api('/api/sms/' + id, {method: 'DELETE'});
+  selected = null; $('#convhead').hidden = true;
+  $('#msgs').innerHTML = `<div class="empty">Deleted ${ids.length} message${ids.length === 1 ? '' : 's'}</div>`;
+}, 'Conversation deleted').then(loadSMS));
+$('#newmsg').onclick = () => { selected = null; $('#convhead').hidden = true;$('#msgs').innerHTML = '<div class="empty">New message</div>'; $('#to').value = ''; $('#to').focus(); renderThreads(); };
+$('#body').oninput = () => {
+  const t = $('#body').value, uni = /[^\x00-\x7f]/.test(t), per = uni ? 70 : 160;
+  $('#count').textContent = `${t.length} chars · ${Math.max(1, Math.ceil(t.length / (t.length > per ? per - (uni ? 3 : 7) : per)))} part(s)${uni ? ' · unicode' : ''}`;
+};
+$('#compose').onsubmit = async e => {
+  e.preventDefault();
+  const number = $('#to').value.trim(), text = $('#body').value;
+  if (!number || !text) return toast('Recipient and message required', true);
+  const r = await act($('#send'), () => api('/api/sms', {method: 'POST', body: {number, text}}), 'Sent');
+  if (r) { $('#body').value = ''; $('#body').oninput(); selected = number; loadSMS(); }
+};
+
+// ---- USSD ----
+let ussdActive = false;
+function ussdLog(cls, text) {
+  const el = $('#ussdlog'); if (el.querySelector('.note')) el.innerHTML = '';
+  el.insertAdjacentHTML('beforeend', `<div class="${cls}">${esc(text)}</div>`); el.scrollTop = el.scrollHeight;
+}
+$('#ussdform').onsubmit = async e => {
+  e.preventDefault();
+  const code = $('#ussdcode').value.trim(); if (!code) return;
+  const btn = e.submitter; btn.disabled = true; ussdLog('me', '> ' + code); $('#ussdcode').value = '';
+  try {
+    const r = await api('/api/ussd', {method: 'POST', body: {code, reply: ussdActive}});
+    ussdLog('', r.reply || '(empty reply)'); ussdActive = true;
+    $('#ussdcode').placeholder = 'Reply (menu number)…';
+  } catch (err) { ussdLog('err', err.message); ussdActive = false; $('#ussdcode').placeholder = '*124#'; }
+  finally { btn.disabled = false; $('#ussdcode').focus(); }
+};
+$('#ussdcancel').onclick = async () => {
+  ussdActive = false; $('#ussdcode').placeholder = '*124#';
+  try { await api('/api/ussd/cancel', {method: 'POST'}); ussdLog('note', '— session ended —'); } catch { ussdLog('note', '— no active session —'); }
+};
+
+// ---- controls ----
+const post = p => () => api(p, {method: 'POST'});
+$('#enable').onclick = e => act(e.target, post('/api/modem/enable'), 'Modem enabled');
+function confirmBtn(btn, label, fn) {
+  btn.onclick = () => {
+    if (btn.dataset.armed) { delete btn.dataset.armed; btn.textContent = label; return fn(btn); }
+    btn.dataset.armed = 1; btn.textContent = 'Click again to confirm';
+    setTimeout(() => { if (btn.dataset.armed) { delete btn.dataset.armed; btn.textContent = label; } }, 3000);
+  };
+}
+confirmBtn($('#disable'), 'Disable', b => act(b, post('/api/modem/disable'), 'Modem disabled'));
+confirmBtn($('#reset'), 'Reset modem', b => act(b, post('/api/modem/reset'), 'Reset sent — modem will re-appear shortly'));
+$('#pinform').onsubmit = e => { e.preventDefault(); const pin = $('#pin').value; $('#pin').value = '';
+  act(e.submitter, () => api('/api/sim/pin', {method: 'POST', body: {pin}}), 'SIM unlocked'); };
+$('#dataform').onsubmit = e => { e.preventDefault();
+  act($('#connect'), () => api('/api/modem/connect', {method: 'POST', body: {apn: $('#apn').value.trim()}}), 'Data bearer connected'); };
+$('#disconnect').onclick = e => act(e.target, post('/api/modem/disconnect'), 'Disconnected');
+$('#logout').onclick = async () => { await api('/api/logout', {method: 'POST'}).catch(() => {}); location.href = '/login'; };
+
+// Ask once for desktop notifications so new OTPs pop up when the tab is in the background.
+document.addEventListener('click', () => { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); }, {once: true});
+
+refresh(); loadSMS();
+setInterval(refresh, 3000);
+setInterval(loadSMS, 5000);
+</script>
+</body>
+</html>

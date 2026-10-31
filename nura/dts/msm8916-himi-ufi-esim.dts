@@ -1,0 +1,84 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * HiMiLink "4G UFI" stick, eSIM-switch revision (stock build msm8916_32_512, 2025-08-28).
+ * Built on mainline's shared msm8916-ufi.dtsi, modelled on msm8916-thwc-ufi001c.dts.
+ *
+ * GPIO map taken from the stock Android DTB (extracted from a full EDL backup of the stock firmware)
+ * and SIM-routing levels read live from /sys/class/leds under stock Android with the
+ * physical SIM working:
+ *
+ *   gpio37  key_freset (reset/EDL button)   gpio36  bat1 (no visible LED)
+ *   gpio71  4g_1 = blue LED                 gpio72  4g_type = red LED
+ *   gpio73  wifistatus = green LED          gpio106 ftest (factory test, left alone)
+ *   gpio119 esim1_en = HIGH   gpio14 esim2_en = LOW   gpio12 esim3_en = LOW
+ *   gpio114 sim_hotplug = LOW
+ *
+ * Verified on hardware: boots Nura, modem + SIM + SMS work (needs db410c firmware + lk1st).
+ */
+
+/dts-v1/;
+
+#include "msm8916-ufi.dtsi"
+
+/ {
+	model = "HiMiLink 4G UFI (eSIM-switch rev)";
+	compatible = "himi,ufi-esim", "qcom,msm8916";
+};
+
+&button_restart {
+	gpios = <&tlmm 37 GPIO_ACTIVE_HIGH>;
+};
+
+&button_default {
+	pins = "gpio37";
+	bias-pull-down;
+};
+
+/* Colours verified by eye on the device (2026-10-30). gpio36 (bat1) drives no visible LED. */
+&led_r {
+	gpios = <&tlmm 72 GPIO_ACTIVE_HIGH>;	/* 4g_type */
+};
+
+&led_g {
+	gpios = <&tlmm 73 GPIO_ACTIVE_HIGH>;	/* wifistatus */
+	linux,default-trigger = "phy0assoc";
+};
+
+&led_b {
+	gpios = <&tlmm 71 GPIO_ACTIVE_HIGH>;	/* 4g_1 */
+};
+
+&gpio_leds_default {
+	pins = "gpio71", "gpio72", "gpio73";
+};
+
+/* Route the physical SIM slot to the modem: replicate the stock-Android pin levels. */
+&mpss {
+	pinctrl-0 = <&sim_ctrl_default>;
+	pinctrl-names = "default";
+};
+
+&tlmm {
+	sim_ctrl_default: sim-ctrl-default-state {
+		esim1-en-pins {
+			pins = "gpio119";
+			function = "gpio";
+			bias-disable;
+			output-high;
+		};
+
+		esim-off-pins {
+			pins = "gpio12", "gpio14";
+			function = "gpio";
+			bias-disable;
+			output-low;
+		};
+
+		sim-hotplug-pins {
+			pins = "gpio114";
+			function = "gpio";
+			bias-disable;
+			output-low;
+		};
+	};
+};

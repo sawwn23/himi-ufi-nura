@@ -1,0 +1,10 @@
+// The web UI service runs without a login session, so the stock plugdev rule
+// (which requires subject.active) does not cover it.
+polkit.addRule(function(action, subject) {
+    if (subject.user == "lte-dongle" &&
+        (action.id == "org.freedesktop.ModemManager1.Device.Control" ||
+         action.id == "org.freedesktop.ModemManager1.Messaging" ||
+         action.id == "org.freedesktop.ModemManager1.USSD")) {
+        return polkit.Result.YES;
+    }
+});

@@ -1,0 +1,43 @@
+#!/bin/sh
+# Unlock the SIM at boot with the PIN from /etc/sim-pin, then enable the modem.
+# Only tries when all 3 PIN retries remain, so a wrong PIN can never lead to a PUK lock.
+PIN=$(cat /etc/sim-pin) || exit 1
+
+# mmcli -K prints "key : value" lines; get <key>
+get() { mmcli -m any -K 2>/dev/null | sed -n "s/^$1 *: //p" | head -1; }
+
+for i in $(seq 1 60); do
+	mmcli -L 2>/dev/null | grep -q Modem/ && break
+	sleep 2
+done
+
+for i in $(seq 1 30); do
+	lock=$(get 'modem\.generic\.unlock-required')
+	case "$lock" in ""|--|unknown) sleep 2; continue ;; esac
+	if [ "$lock" != "sim-pin" ]; then
+		echo "SIM lock is '$lock'; nothing to unlock"
+		break
+	fi
+	retries=$(mmcli -m any -K 2>/dev/null | sed -n 's/^modem\.generic\.unlock-retries\.value\[[0-9]*\] *: sim-pin (\([0-9]*\))$/\1/p')
+	if [ "$retries" != "3" ]; then
+		echo "PIN retries left: ${retries:-?} (not 3) - refusing to try, unlock manually"
+		exit 1
+	fi
+	if mmcli -i any --pin="$PIN" >/dev/null 2>&1; then
+		echo "SIM unlocked"
+		break
+	fi
+	echo "unlock attempt failed; checking state again"
+	sleep 3
+done
+
+# ModemManager usually enables the modem itself after unlock; make sure, and arm signal readings.
+for i in $(seq 1 20); do
+	case "$(get 'modem\.generic\.state')" in
+	registered|connected|searching|enabled) break ;;
+	disabled) mmcli -m any --enable >/dev/null 2>&1 ;;
+	esac
+	sleep 3
+done
+mmcli -m any --signal-setup=5 >/dev/null 2>&1
+echo "modem state: $(get 'modem\.generic\.state')"

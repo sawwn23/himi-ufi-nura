@@ -1,0 +1,10 @@
+#!/bin/sh
+# Announce dongle.local on Wi-Fi only: usb0 keeps 172.16.42.1 even when unplugged, and
+# clients that picked it for dongle.local couldn't connect.
+conf=/etc/avahi/avahi-daemon.conf
+if [ -f $conf ]; then
+	sed -i 's/^#\?allow-interfaces=.*/allow-interfaces=wlan0/' $conf
+fi
+systemd-sysusers lte-dongle-sysusers.conf 2>/dev/null || systemd-sysusers 2>/dev/null || true
+systemd-tmpfiles --create /etc/tmpfiles.d/lte-dongle.conf 2>/dev/null || true
+exit 0

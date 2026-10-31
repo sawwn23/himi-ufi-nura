@@ -1,0 +1,27 @@
+[Unit]
+Description=LTE dongle web UI (http://dongle.local:8080)
+After=ModemManager.service network-online.target
+Wants=ModemManager.service network-online.target
+
+[Service]
+User=lte-dongle
+Group=lte-dongle
+ExecStart=/usr/bin/lte-dongle -addr :8080 -passwd-file /var/lib/lte-dongle/passwd -telegram-file /var/lib/lte-dongle/telegram -led /sys/class/leds/blue:wan/brightness
+ExecStopPost=+/bin/sh -c 'echo 0 > /sys/class/leds/blue:wan/brightness'
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/lte-dongle /sys/devices/platform/leds/leds/blue:wan/brightness
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,2 @@
+# Let the web UI service drive the blue status LED.
+ACTION=="add", SUBSYSTEM=="leds", KERNEL=="blue:wan", RUN+="/bin/chgrp lte-dongle /sys%p/brightness", RUN+="/bin/chmod g+w /sys%p/brightness"

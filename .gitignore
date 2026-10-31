@@ -1,0 +1,19 @@
+# built artifacts
+/webapp/lte-dongle
+/webapp/lte-dongle.arm64
+/nura/device-himi-ufi/lte-dongle-webapp.tar.gz
+# device-specific data: IMEI, RF calibration, SMS dumps
+/backup-*/
+/efsms.txt
+# checkouts and secrets
+/nura/pmos-dts/
+/nura/fw/src/
+/nura/fw/db410c/
+/nura/ref/
+/tools/
+*.pem
+passwd
+session.key
+telegram
+sim-pin
+/nura/overlay/usr/bin/diag_nv

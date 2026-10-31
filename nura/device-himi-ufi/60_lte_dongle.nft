@@ -1,0 +1,8 @@
+#!/usr/sbin/nft -f
+
+table inet filter {
+	chain input {
+		iifname "wlan*" tcp dport 8080 accept comment "LTE dongle web UI"
+		iifname "usb*" tcp dport 8080 accept comment "LTE dongle web UI"
+	}
+}

@@ -1,0 +1,97 @@
+# Local device package (not upstream). DTB built from ~/3d-modem/nura/msm8916-himi-ufi-esim.dts
+# against msm8916-mainline/linux v6.12.1-msm8916.
+pkgname=device-himi-ufi
+pkgdesc="HiMiLink 4G UFI LTE dongle (eSIM-switch revision)"
+pkgver=1
+pkgrel=4
+url="https://postmarketos.org"
+license="GPL"
+arch="aarch64"
+options="!check !archcheck"
+install="$pkgname.post-install"
+depends="
+	linux-postmarketos-qcom-msm8916
+	mkbootimg
+	msm-firmware-loader
+	postmarketos-base
+	soc-qcom-msm8916
+	soc-qcom-msm8916-rproc
+"
+makedepends="devicepkg-dev go"
+source="deviceinfo kernel-cmdline.conf msm8916-himi-ufi-esim.dtb
+	diag_nv.go diag_nv.mod diag-bind himi-ok-guard modem-watchdog sim-autounlock
+	himi-ok-guard.service modem-watchdog.service sim-autounlock.service watchdog.conf
+	lte-dongle-webapp.tar.gz lte-dongle.service lte-dongle-sysusers.conf lte-dongle-tmpfiles.conf
+	50-lte-dongle.rules 60_lte_dongle.nft 90-lte-dongle-led.rules uim-retry.conf"
+
+build() {
+	devicepkg_build $startdir $pkgname
+
+	# diag_nv: writes modem NV item 2500 = "HiMI_OK" (see himi-ok-guard). Stdlib only.
+	mkdir -p "$builddir"
+	cp "$srcdir"/diag_nv.go "$builddir"/main.go
+	cp "$srcdir"/diag_nv.mod "$builddir"/go.mod
+	(cd "$builddir" && CGO_ENABLED=0 go build -ldflags="-s -w" -o diag_nv .)
+
+	# lte-dongle: the web UI (sources in ~/3d-modem/webapp, stdlib only). go.mod pins a patch
+	# release that Alpine's go may not match; GOTOOLCHAIN=local forbids downloading one.
+	mkdir -p "$builddir"/webapp
+	tar xzf "$srcdir"/lte-dongle-webapp.tar.gz -C "$builddir"/webapp
+	(cd "$builddir"/webapp && sed -i 's/^go .*/go 1.25/' go.mod &&
+		GOTOOLCHAIN=local CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o ../lte-dongle .)
+}
+
+package() {
+	devicepkg_package $startdir $pkgname
+	install -Dm644 "$srcdir"/msm8916-himi-ufi-esim.dtb \
+		"$pkgdir"/usr/share/dtb/msm8916-himi-ufi-esim.dtb
+
+	# Modem stability: stops the ~15 min HiMiLink firmware crash (NV 2500 must be "HiMI_OK"),
+	# soft-restarts the modem if it crashes anyway, unlocks the SIM, feeds the HW watchdog.
+	install -Dm755 "$builddir"/diag_nv "$pkgdir"/usr/bin/diag_nv
+	for f in diag-bind himi-ok-guard modem-watchdog sim-autounlock; do
+		install -Dm755 "$srcdir"/$f "$pkgdir"/usr/sbin/$f
+	done
+	for u in himi-ok-guard modem-watchdog sim-autounlock; do
+		install -Dm644 "$srcdir"/$u.service "$pkgdir"/etc/systemd/system/$u.service
+		install -d "$pkgdir"/etc/systemd/system/multi-user.target.wants
+		ln -s ../$u.service "$pkgdir"/etc/systemd/system/multi-user.target.wants/$u.service
+	done
+	install -Dm644 "$srcdir"/watchdog.conf "$pkgdir"/etc/systemd/system.conf.d/watchdog.conf
+
+	# Web UI on :8080 as unprivileged user lte-dongle. Not enabled here: it needs a password
+	# file first (see README), then `systemctl enable --now lte-dongle`.
+	install -Dm755 "$builddir"/lte-dongle "$pkgdir"/usr/bin/lte-dongle
+	install -Dm644 "$srcdir"/lte-dongle.service "$pkgdir"/etc/systemd/system/lte-dongle.service
+	install -Dm644 "$srcdir"/lte-dongle-sysusers.conf "$pkgdir"/etc/sysusers.d/lte-dongle.conf
+	install -Dm644 "$srcdir"/lte-dongle-tmpfiles.conf "$pkgdir"/etc/tmpfiles.d/lte-dongle.conf
+	install -Dm644 "$srcdir"/50-lte-dongle.rules "$pkgdir"/etc/polkit-1/rules.d/50-lte-dongle.rules
+	install -Dm644 "$srcdir"/60_lte_dongle.nft "$pkgdir"/etc/nftables.d/60_lte_dongle.nft
+	install -Dm644 "$srcdir"/90-lte-dongle-led.rules "$pkgdir"/etc/udev/rules.d/90-lte-dongle-led.rules
+	install -Dm644 "$srcdir"/uim-retry.conf \
+		"$pkgdir"/etc/systemd/system/msm-modem-uim-selection.service.d/retry.conf
+}
+
+sha512sums="
+e983416bdc28a2d51dc8802cc6146a4dcec5d8441719a265d6206f0e986bbd4fa737d17453f5524e18f325aa88e4ef15fbc8888841f8284e88f4d96b4495a1fb  deviceinfo
+37e1e5f8839b624ab3eb850a24ed4daeb61a651257a1fb593f49cb869323e5d1b339c831a18eb26a9d7bd0a618ea9eb2bb9bf3882133af5f2606a878e6d39c67  kernel-cmdline.conf
+048f15daba8995bf69c113d330b059a6523a7e02edf1b4ad638a1aa86affcb87ba4c9afd6dd3e736e726db56e31ff3d5dbbea14dc072554458165cc5581a9d40  msm8916-himi-ufi-esim.dtb
+0538e8827e5d55a48f46e76559ff8859a24f41c507f6af4b30d1b2a90efba8c308237736e6ad7c4194d2ae0f7f6ba915a9b621cc3f4311056436210e2e9ff751  diag_nv.go
+e3ad2eddc13402c3b910a7ce89d61103815409a747602a906e28b9cbd35853d108790e4eb933d3741ac63e5ee23171f83f2606b53baafc791c59f6afc5266119  diag_nv.mod
+0889b27f725a9fe2d38b3efb5e980b4ac5148fb449adba7e18ee57b3132243bed315e1f2c2a3d371e6bbf56d586e23868b80792125317699b3d4a451a5e7422b  diag-bind
+0ca2e1b91cabb4cc913c1f678acaca94278d17e88fba22982ddb4e4e10f86759b82cdb70102e1a5fc457818b2ae3e6e80453cc4827e0949033a0144cec34f1b0  himi-ok-guard
+c0e4db0bae6813dc3e4c16640d26b88a7911d1af9ba04c3709dc8e469245220e5fdbf31a1c67c90793f5d41ef5e7496f73609739448a56e84e59808dba6c7d7c  modem-watchdog
+ebb606c8bb68a42e64ec5e85396dab27c9aff7931c19c5daf5bd090d52877dc817e5d205ebec985cefe40358d6c8b6df4107a6d2fb7e7a1678b3a1d99cfa5627  sim-autounlock
+83d5d5112fd99179327a50fba0ce97c5bfc728bba08427e7015b0c13317f3f60aa9944d744d440ffdf1d80865756594e214b38adcdb80cae5860e2ed907d3703  himi-ok-guard.service
+535b5ba6b31a00773a4433bd771a6b721f6e6d1b39df30bb4d6e82355cc1166ade1500638e8413c5ac05e7fa855c8feb1cfa3b4f53529f9b9aafea5e7c2d4d6c  modem-watchdog.service
+9ea743eb1241c2c5917d15f2edafbddef732d1f219683074a7c992aab25cd1d18e0d1183f3a80b60c6263c3d1327310a5b52c17fe5cf4470af11e179b018a470  sim-autounlock.service
+66842e8b40e800374584fd892d770fa1c16d3618383b6a0285d3ecb77972992e4e2f773a5d9bc7f3b8bc3ac4dc85928c0ccfbe1c553e81997c3b0c7c511b7453  watchdog.conf
+ce3dd685bd05240e2e70dd3be21ada602e9fab3d71cb26767c25936bd2008f5dfc42c21e8b4b0b3873622e96afa084671a390fd2b0175b7a96d61461a1eda9b8  lte-dongle-webapp.tar.gz
+0e6507f4b601e06b7bffa40082038cf3de2386463f03504022da5d485f16f5463b24295d0b63722748ad043b5b60293df21b321006316a456519a28718d60db2  lte-dongle.service
+fcf85a7fd7468dd681106e9c989445e4566f9481018de3f88c874dd173f5f640bb01119e00cb13dec6db92572c3f64f7b4bc048d5b6b11b84618e7d6da795c76  lte-dongle-sysusers.conf
+7660b19e3c45f4e17f622966df69190dd5eac8b60f21e6de91866660ca1b3377ebdae569c893e2b5330bd1466e92d9df20e6010a9118beaacccf4908ae3e516b  lte-dongle-tmpfiles.conf
+f49f2cc967de0ab0390962d4041b72706015adcdcd02e1135c85490fa10390885fe2b97d8fc5876e5c00af8629bc771c8bc973aa30a0aab249efd65bba8da5a8  50-lte-dongle.rules
+0b462915612feb898de18d1312d733fe5c70edc9dad7c7d4f4443b154faefa187b182eae0fc7de81f760e3f64ba60dafad42175700aa469f823667a05e98c2c3  60_lte_dongle.nft
+8f1b04b7317b33801cd479c5103c094b3f5c0fd074b346257d84fc292c007cd7efd02283bd52b3b649bb02a55381254ad4ec93332c78de4dc6c499a220d48e95  90-lte-dongle-led.rules
+1a45647aea9cbc59914316b835ca52c4b9a61937901bee18156ba2722ec17bc34ea9424f60d61277870893e0ef9353026b078dc1fdb7ccbf6e55ed941e2a0bbf  uim-retry.conf
+"

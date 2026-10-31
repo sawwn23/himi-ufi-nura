@@ -1,0 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// 32-bit (armv7) wrapper: stock firmware is 32-bit only (no PSCI / aarch64 switch).
+#include "msm8916-himi-ufi-esim.dts"
+#include "qcom-msm8916-smp.dtsi"

@@ -1,0 +1,12 @@
+[Unit]
+Description=Keep modem NV 2500 = HiMI_OK (stops the ~15 min modem firmware crash)
+After=ModemManager.service
+
+[Service]
+Environment=PATH=/usr/bin:/usr/sbin:/bin:/sbin
+ExecStart=/usr/sbin/himi-ok-guard
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

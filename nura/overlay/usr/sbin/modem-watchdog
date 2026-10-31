@@ -1,0 +1,84 @@
+#!/bin/sh
+# Keep the modem usable without a human:
+# - Modem firmware crash (kernel "crash detected" for the MSS remoteproc): the kernel's own restart
+#   leaves the modem SIM-locked and, once unlocked, stuck in "searching" with no cell. Instead
+#   stop/start the MSS remoteproc ourselves, then run sim-autounlock (back in ~1 min instead of a
+#   ~3 min reboot). If it isn't registered 3 min later, or it crashed again within 5 min of the last
+#   soft restart, reboot. These don't count toward back-off.
+# - SIM locked for 2 min: run sim-autounlock (it only tries with all 3 PIN retries left).
+# - Unregistered for 10 min otherwise: reboot. Consecutive such reboots back off
+#   (10, 20, 40 min ... capped at 6 h) so a spot without coverage can't boot-loop;
+#   the count resets once the modem registers. Uses uptime only: there is no RTC.
+STATE=${WD_STATE:-/var/lib/modem-watchdog/count}
+BASE=${WD_BASE:-600} CAP=${WD_CAP:-21600} INTERVAL=${WD_INTERVAL:-30} LOCKED_MAX=${WD_LOCKED:-120}
+UNLOCK=${WD_UNLOCK:-/usr/sbin/sim-autounlock}
+
+get() { mmcli -m any -K 2>/dev/null | sed -n "s/^$1 *: //p" | head -1; }
+uptime_s() { cut -d. -f1 /proc/uptime; }
+crashes() { journalctl -k -b -o cat 2>/dev/null | grep -c 'crash detected in 4080000.remoteproc'; }
+# remoteprocN numbering changes between boots: find the modem (MSS) by name.
+mss_path() { for r in /sys/class/remoteproc/remoteproc*; do [ "$(cat "$r/name" 2>/dev/null)" = 4080000.remoteproc ] && echo "$r"; done; }
+soft_restart() {
+	echo "modem firmware crashed ($(journalctl -k -b -o cat | grep -o 'fatal error received: .*' | tail -1)); restarting the modem"
+	MSS=${WD_MSS:-$(mss_path)}
+	echo stop > "$MSS/state"; sleep 3; echo start > "$MSS/state"
+	t=0
+	while [ "$t" -lt 90 ] && [ "$(get 'modem\.generic\.state')" != locked ]; do sleep 3; t=$((t + 3)); done
+	$UNLOCK
+	t=0
+	while [ "$t" -lt 180 ]; do
+		case "$(get 'modem\.generic\.state')" in registered|connected) echo "modem back after soft restart"; return 0 ;; esac
+		sleep 5; t=$((t + 5))
+	done
+	return 1
+}
+reboot_now() { echo "$1; rebooting"; sync; systemctl reboot; exit 0; }
+
+count=$(cat "$STATE" 2>/dev/null); count=${count:-0}
+limit=$BASE i=0
+while [ "$i" -lt "$count" ] && [ "$limit" -lt "$CAP" ]; do limit=$((limit * 2)); i=$((i + 1)); done
+[ "$limit" -gt "$CAP" ] && limit=$CAP
+# Start from 0: a crash earlier in this boot (before we started) also leaves the modem broken.
+seen_crashes=0
+echo "started; reboots in a row: $count, reboot after $((limit / 60)) min unregistered"
+
+bad_since=$(uptime_s) locked_since= unlock_tried= last= soft_at=
+while sleep "$INTERVAL"; do
+	c=$(crashes)
+	# Crash in the first 5 min of a boot: leave it to the back-off path, so it can't boot-loop.
+	if [ "$c" -gt "$seen_crashes" ] && [ "$(uptime_s)" -ge 300 ]; then
+		now=$(uptime_s)
+		if [ -n "$soft_at" ] && [ $((now - soft_at)) -lt 300 ]; then reboot_now "modem crashed again right after a soft restart"; fi
+		soft_at=$now
+		soft_restart || reboot_now "modem not registered after soft restart"
+		seen_crashes=$(crashes); bad_since= locked_since= unlock_tried=
+		continue
+	fi
+
+	state=$(get 'modem\.generic\.state')
+	[ "$state" != "$last" ] && echo "modem state: ${state:-<no modem>}" && last=$state
+	case "$state" in
+	registered|connected|connecting|disconnecting)
+		if [ "$count" != 0 ]; then
+			echo 0 > "$STATE"; count=0 limit=$BASE
+			echo "modem registered; reboot back-off reset"
+		fi
+		bad_since= locked_since= unlock_tried=
+		continue ;;
+	locked)
+		bad_since=
+		[ -z "$locked_since" ] && locked_since=$(uptime_s)
+		if [ -z "$unlock_tried" ] && [ $(($(uptime_s) - locked_since)) -ge "$LOCKED_MAX" ]; then
+			unlock_tried=1
+			echo "SIM locked for $((LOCKED_MAX / 60)) min; running sim-autounlock"
+			$UNLOCK
+		fi
+		continue ;;
+	esac
+	locked_since=
+	[ -z "$bad_since" ] && bad_since=$(uptime_s)
+	if [ $(($(uptime_s) - bad_since)) -ge "$limit" ]; then
+		echo $((count + 1)) > "$STATE"
+		reboot_now "modem unregistered (${state:-no modem}) for $((limit / 60)) min"
+	fi
+done

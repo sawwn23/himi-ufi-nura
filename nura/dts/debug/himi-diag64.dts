@@ -1,0 +1,5 @@
+// Diagnostic arm64 variant: heartbeat/panic LEDs.
+#include "msm8916-himi-ufi-esim.dts"
+
+&led_g { linux,default-trigger = "heartbeat"; };
+&led_b { linux,default-trigger = "panic"; };

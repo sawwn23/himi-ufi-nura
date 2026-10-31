@@ -1,0 +1,12 @@
+[Unit]
+Description=Unlock SIM with stored PIN and enable modem
+After=ModemManager.service
+Wants=ModemManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/sim-autounlock
+TimeoutStartSec=5min
+
+[Install]
+WantedBy=multi-user.target

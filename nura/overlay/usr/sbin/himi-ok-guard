@@ -1,0 +1,19 @@
+#!/bin/sh
+# Keep modem NV item 2500 == "HiMI_OK". The HiMiLink baseband compares it at ~300 s of modem
+# uptime; on mismatch it self-destructs ~600 s later (lte_ml1_common_timer.c:390 fatal, ~15 min
+# after every modem start). The modem clears the item on every boot, so re-check continuously:
+# this also covers modem restarts, which drop the DIAG rpmsg binding (diag-bind rebinds it).
+# Only an ALL-ZERO item is overwritten; anything else may be real factory data.
+DEV=/dev/rpmsg0 TOKEN=48694d495f4f4b INTERVAL=${HIMI_INTERVAL:-10}
+log() { echo "$*"; }
+log "started"
+while sleep "$INTERVAL"; do
+	[ -c "$DEV" ] || /usr/sbin/diag-bind >/dev/null 2>&1
+	[ -c "$DEV" ] || continue
+	out=$(diag_nv -dev "$DEV" read 2500 2>/dev/null)
+	case "$out" in *HiMI_OK*) continue ;; *status=0x0000*) ;; *) continue ;; esac
+	hex=$(printf '%s\n' "$out" | sed -n 's/^[0-9a-f][0-9a-f]*  \(.*\) |.*/\1/p' | tr -d ' \n')
+	case "$hex" in ''|*[!0]*) log "item 2500 holds other data; leaving it"; continue ;; esac
+	w=$(diag_nv -dev "$DEV" write 2500 "$TOKEN" 2>/dev/null)
+	case "$w" in *"VERIFY: MATCH"*) log "item 2500 was cleared; wrote HiMI_OK" ;; *) log "write did not verify" ;; esac
+done

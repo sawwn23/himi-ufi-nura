@@ -1,0 +1,6 @@
+// Bisect variant: our board DTS with modem/wifi subsystems disabled.
+#include "msm8916-himi-ufi-esim.dts"
+
+&mpss { status = "disabled"; };
+&wcnss { status = "disabled"; };
+&bam_dmux { status = "disabled"; };

@@ -1,0 +1,5 @@
+// Diagnostic variant: LEDs report kernel state since we have no serial console.
+#include "qcom-msm8916-himi-ufi-esim.dts"
+
+&led_g { linux,default-trigger = "heartbeat"; };	/* wifistatus: kernel alive */
+&led_b { linux,default-trigger = "panic"; };		/* 4g_1: kernel panic */
